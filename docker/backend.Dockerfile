@@ -26,7 +26,7 @@ RUN npm run build
 FROM ubuntu:22.04 AS ffmpeg-builder
 
 # Install build dependencies
-RUN apt-get update && apt-get install -y software-properties-common && \
+RUN apt-get update && \
     add-apt-repository -y universe && \
     add-apt-repository -y multiverse && \
     apt-get update && apt-get install -y \
@@ -126,10 +126,10 @@ ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Install runtime dependencies including VAAPI
-RUN apt-get update && apt-get install -y software-properties-common && \
+RUN apt-get update && \
     add-apt-repository -y universe && \
     add-apt-repository -y multiverse && \
-    apt-get install -y \
+    apt-get update && apt-get install -y \
     libva2 \
     libva-drm2 \
     intel-media-va-driver-non-free \
