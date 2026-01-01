@@ -23,6 +23,7 @@ from av.video.frame import VideoFrame
 from av.audio.frame import AudioFrame
 from PIL import Image
 import av as av_module
+import av.hwdevice
 
 from .types import MIoTCameraFrameType, MIoTCameraCodec, MIoTCameraFrameData
 from .error import MIoTMediaDecoderError
@@ -168,6 +169,7 @@ class MIoTMediaDecoder(threading.Thread):
     _video_decoder: Optional[CodecContext]
     _audio_decoder: Optional[CodecContext]
     _resampler: AudioResampler
+    _hw_device_ctx: Optional[av.hwdevice.DeviceContext]
 
     _current_jpg_width: int
     _current_jpg_height: int
@@ -230,6 +232,7 @@ class MIoTMediaDecoder(threading.Thread):
         self._queue.stop()
         self._video_decoder = None
         self._audio_decoder = None
+        self._hw_device_ctx = None  # Clean up hardware device context
         self.join()
 
     def push_video_frame(self, frame_data: MIoTCameraFrameData) -> None:
@@ -279,26 +282,51 @@ class MIoTMediaDecoder(threading.Thread):
     def _init_hw_decoder(self, codec_name: str) -> VideoCodecContext:
         """Initialize hardware decoder for HEVC/H.264 with VAAPI support."""
         try:
-            # Try to create decoder with explicit hardware acceleration
+            _LOGGER.info(f"Initializing VAAPI hardware decoder for {codec_name}")
+            
+            # Determine VAAPI device path
+            device_path = "/dev/dri/renderD128"
+            if not os.path.exists(device_path):
+                device_path = "/dev/dri/card0"
+                if not os.path.exists(device_path):
+                    raise Exception(f"VAAPI device not found: checked /dev/dri/renderD128 and /dev/dri/card0")
+            
+            _LOGGER.info(f"Using VAAPI device: {device_path}")
+            
+            # Create a VAAPI hardware device context
+            hw_device = av.hwdevice.Device(
+                av.hwdevice.HWDeviceType.VAAPI,
+                device_path
+            )
+            _LOGGER.info("VAAPI hardware device context created successfully")
+            
+            # Create codec context
             decoder = VideoCodecContext.create(codec_name, "r")
+            
+            # Attach hardware device context
+            decoder.hw_device_ctx = hw_device
+            _LOGGER.info(f"Hardware device context attached to {codec_name} decoder")
+            
+            # IMPORTANT: tell FFmpeg to output VAAPI frames
+            decoder.options = {
+                "hwaccel": "vaapi",
+                "hwaccel_output_format": "vaapi",
+            }
+            _LOGGER.info("VAAPI acceleration options set")
             
             # Set thread type to auto for better performance
             decoder.thread_type = 'auto'
             
-            # Try to use hardware acceleration by setting options
-            # Note: This may not work in all PyAV versions
-            try:
-                # Set hardware acceleration options
-                # This attempts to use VAAPI if available
-                pass
-            except Exception as e:
-                _LOGGER.debug(f"Could not set hwaccel options: {e}")
+            # Store device context for cleanup
+            self._hw_device_ctx = hw_device
             
-            _LOGGER.info(f"Created decoder for {codec_name}, attempting VAAPI hardware acceleration")
+            _LOGGER.info(f"VAAPI hardware decoder for {codec_name} initialized successfully")
             return decoder
             
         except Exception as e:
-            _LOGGER.warning(f"Failed to init HW decoder for {codec_name}: {e}, fallback to software")
+            _LOGGER.warning(f"Failed to init VAAPI HW decoder for {codec_name}: {e}, fallback to software")
+            _LOGGER.warning("This is normal if PyAV doesn't support av.hwdevice API")
+            # Fallback to software decoder
             return VideoCodecContext.create(codec_name, "r")
 
     def _on_video_callback(self, frame_data: MIoTCameraFrameData) -> None:
@@ -333,6 +361,9 @@ class MIoTMediaDecoder(threading.Thread):
             
             # Process frame to RGB
             try:
+                # Log frame format to verify hardware acceleration
+                _LOGGER.debug(f"Frame format: {frame.format.name}, width: {frame.width}, height: {frame.height}")
+                
                 # Convert to RGB format (works for both software and hardware frames)
                 rgb_frame: VideoFrame = frame.reformat(frame.width, frame.height, format='rgb24')
                 
