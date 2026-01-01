@@ -27,7 +27,9 @@ FROM ubuntu:22.04 AS ffmpeg-builder
 
 # Install build dependencies
 RUN apt-get update && \
-    sed -i 's/Components: main restricted/Components: main restricted universe multiverse/g' /etc/apt/sources.list.d/ubuntu.sources && \
+    [ -f /etc/apt/sources.list.d/ubuntu.sources ] && sed -i 's/Components: main restricted/Components: main restricted universe multiverse/g' /etc/apt/sources.list.d/ubuntu.sources || true && \
+    [ -f /etc/apt/sources.list ] && sed -i 's/main/main restricted universe multiverse/g' /etc/apt/sources.list || true && \
+    \
     apt-get update && apt-get install -y \
     wget \
     tar \
@@ -124,8 +126,10 @@ ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Install runtime dependencies including VAAPI
-RUN apt-get update && \
-    sed -i 's/Components: main restricted/Components: main restricted universe multiverse/g' /etc/apt/sources.list.d/ubuntu.sources && \
+RUN apt-get update && \    
+    [ -f /etc/apt/sources.list.d/ubuntu.sources ] && sed -i 's/Components: main restricted/Components: main restricted universe multiverse/g' /etc/apt/sources.list.d/ubuntu.sources || true && \
+    [ -f /etc/apt/sources.list ] && sed -i 's/main/main restricted universe multiverse/g' /etc/apt/sources.list || true && \
+    \
     apt-get update && apt-get install -y \
     libva2 \
     libva-drm2 \
