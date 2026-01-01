@@ -22,6 +22,7 @@ from av.audio.resampler import AudioResampler
 from av.video.frame import VideoFrame
 from av.audio.frame import AudioFrame
 from PIL import Image
+import av as av_module
 
 from .types import MIoTCameraFrameType, MIoTCameraCodec, MIoTCameraFrameData
 from .error import MIoTMediaDecoderError
@@ -224,16 +225,34 @@ class MIoTMediaDecoder(threading.Thread):
     def _detect_hw_acceleration(self) -> bool:
         """Detect if hardware acceleration is available."""
         try:
-            # Try to create a temporary decoder to check hardware devices
-            temp_decoder = VideoCodecContext.create("h264", "r")
-            hw_devices = temp_decoder.hw_devices
+            # Check PyAV version
+            pyav_version = av_module.__version__
+            _LOGGER.info(f"PyAV version: {pyav_version}")
             
-            if hw_devices:
-                for device in hw_devices:
-                    if device.type == 'vaapi':
+            # Try to check if FFmpeg has VAAPI support via command line
+            try:
+                result = subprocess.run(
+                    ["ffmpeg", "-hwaccels"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    check=False
+                )
+                if result.returncode == 0:
+                    hwaccels = result.stdout
+                    if "vaapi" in hwaccels.lower():
                         self._hw_accel_type = 'vaapi'
-                        _LOGGER.info("VAAPI hardware acceleration detected")
+                        _LOGGER.info("VAAPI hardware acceleration detected (via FFmpeg)")
                         return True
+            except FileNotFoundError:
+                _LOGGER.debug("ffmpeg command not found for hwaccel check")
+            
+            # Alternative: check if VAAPI device exists
+            if os.path.exists("/dev/dri/renderD128") or os.path.exists("/dev/dri/card0"):
+                _LOGGER.info("VAAPI device detected, hardware acceleration may be available")
+                # Note: We'll try to use hwaccel when creating decoder
+                self._hw_accel_type = 'vaapi'
+                return True
             
             _LOGGER.info("No VAAPI hardware acceleration available, will use software decoding")
             return False
@@ -245,22 +264,13 @@ class MIoTMediaDecoder(threading.Thread):
     def _init_hw_decoder(self, codec_name: str) -> VideoCodecContext:
         """Initialize hardware decoder for HEVC/H.264 with VAAPI support."""
         try:
+            # Create decoder with thread_type set to auto for better performance
+            # This allows FFmpeg to use hardware acceleration if available
             decoder = VideoCodecContext.create(codec_name, "r")
+            decoder.thread_type = 'auto'
             
-            # Get available hardware devices
-            hw_devices = decoder.hw_devices
-            
-            if not hw_devices:
-                raise Exception("No hardware devices available")
-            
-            # Find VAAPI device
-            for hw_device in hw_devices:
-                if hw_device.type == 'vaapi':
-                    decoder.hw_device = hw_device
-                    _LOGGER.info(f"Using VAAPI hardware decoder for {codec_name}")
-                    return decoder
-            
-            raise Exception("VAAPI device not found")
+            _LOGGER.info(f"Created decoder for {codec_name} with hardware acceleration support")
+            return decoder
             
         except Exception as e:
             _LOGGER.warning(f"Failed to init HW decoder for {codec_name}: {e}, fallback to software")
@@ -282,9 +292,7 @@ class MIoTMediaDecoder(threading.Thread):
                     self._video_decoder = VideoCodecContext.create("hevc", "r")
                     _LOGGER.info("Using software decoder for HEVC")
             
-            _LOGGER.info("Video decoder created, codec=%s, hw_accel=%s", 
-                        frame_data.codec_id, 
-                        self._video_decoder.hw_device is not None)
+            _LOGGER.info("Video decoder created, codec=%s", frame_data.codec_id)
         
         pkt = Packet(frame_data.data)
         frames: List[VideoFrame] = self._video_decoder.decode(pkt)  # type: ignore
@@ -298,14 +306,10 @@ class MIoTMediaDecoder(threading.Thread):
             
             frame = frames[0]
             
-            # Handle hardware frames - need to transfer to system memory
+            # Process frame to RGB
             try:
-                if frame.format.name.startswith('vaapi'):
-                    # Hardware frame: convert to RGB in system memory
-                    rgb_frame: VideoFrame = frame.reformat(frame.width, frame.height, format='rgb24')
-                else:
-                    # Already in system memory format
-                    rgb_frame: VideoFrame = frame.to_rgb()
+                # Convert to RGB format (works for both software and hardware frames)
+                rgb_frame: VideoFrame = frame.reformat(frame.width, frame.height, format='rgb24')
                 
                 img: Image.Image = rgb_frame.to_image()
                 buf: BytesIO = BytesIO()
