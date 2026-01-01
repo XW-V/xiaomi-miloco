@@ -40,8 +40,10 @@ RUN apt-get update && \
     yasm \
     pkg-config \
     nasm \
+    libdrm-dev \
     libva-dev \
-    libva-drm2 \
+    libx264-dev \
+    libx265-dev \
     intel-media-va-driver \
     && rm -rf /var/lib/apt/lists/*
 
