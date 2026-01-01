@@ -126,8 +126,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN apt-get update && apt-get install -y \
     libva2 \
     libva-drm2 \
-    libva-intel-driver \
-    intel-media-va-driver-non-free \
+    intel-media-va-driver \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy FFmpeg and PyAV from builders
