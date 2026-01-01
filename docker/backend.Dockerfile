@@ -5,8 +5,8 @@
 # For China: 
 # - https://mirrors.aliyun.com/pypi/simple/
 # - https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
-ARG PIP_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
-
+#ARG PIP_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+ARG PIP_INDEX_URL=https://pypi.org/simple
 
 ################################################
 # Frontend Builder
@@ -26,7 +26,10 @@ RUN npm run build
 FROM ubuntu:22.04 AS ffmpeg-builder
 
 # Install build dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y software-properties-common && \
+    add-apt-repository -y universe && \
+    add-apt-repository -y multiverse && \
+    apt-get update && apt-get install -y \
     wget \
     tar \
     git \
@@ -87,7 +90,7 @@ FROM ffmpeg-builder AS pyav-builder
 RUN apt-get update && apt-get install -y \
     software-properties-common \
     && add-apt-repository ppa:deadsnakes/ppa \
-    && apt-get update && apt-get install -y \
+    && apt-get install -y \
     python3.12 \
     python3.12-dev \
     python3.12-venv \
@@ -123,7 +126,10 @@ ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Install runtime dependencies including VAAPI
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y software-properties-common && \
+    add-apt-repository -y universe && \
+    add-apt-repository -y multiverse && \
+    apt-get install -y \
     libva2 \
     libva-drm2 \
     intel-media-va-driver \
