@@ -23,7 +23,7 @@ RUN npm run build
 ################################################
 # FFmpeg Builder with VAAPI
 ################################################
-FROM ubuntu:22.04 AS ffmpeg-builder
+FROM --platform=linux/amd64 ubuntu:22.04 AS ffmpeg-builder
 
 # Install build dependencies
 RUN apt-get update && \
