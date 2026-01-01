@@ -41,7 +41,7 @@ RUN apt-get update && apt-get install -y software-properties-common && \
     nasm \
     libva-dev \
     libva-drm2 \
-    intel-media-va-driver \
+    intel-media-va-driver-non-free \
     && rm -rf /var/lib/apt/lists/*
 
 # Set FFmpeg version
@@ -132,7 +132,7 @@ RUN apt-get update && apt-get install -y software-properties-common && \
     apt-get install -y \
     libva2 \
     libva-drm2 \
-    intel-media-va-driver \
+    intel-media-va-driver-non-free \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy FFmpeg and PyAV from builders
