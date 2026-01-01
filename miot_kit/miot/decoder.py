@@ -122,8 +122,8 @@ class MIoTMediaDecoder(threading.Thread):
         frame_interval: int,
         video_callback: Callable[[bytes, int, int], Coroutine],
         audio_callback: Optional[Callable[[bytes, int, int], Coroutine]] = None,
-        enable_hw_accel: bool = False,
-        enable_audio: bool = False,
+        enable_hw_accel: bool = True,
+        enable_audio: bool = True,
         main_loop: Optional[asyncio.AbstractEventLoop] = None,
     ) -> None:
         super().__init__()

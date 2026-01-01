@@ -66,6 +66,7 @@ class MIoTHomeInfo(BaseModel):
 class MIoTCameraVideoQuality(int, Enum):
     """MIoT Camera Video Quality."""
     LOW = 1
+    MEDIUM = 2
     HIGH = 3
 
 

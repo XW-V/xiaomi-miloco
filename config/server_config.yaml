@@ -56,7 +56,7 @@ trigger_rule_runner:
 
 # Camera configuration
 camera:
-  frame_interval: 500 # Unit: Millisecond (ms)
+  frame_interval: 2000 # Unit: Millisecond (ms)
 
 
 # MIoT configuration, default to 'cn', use your MiHome cloud server
