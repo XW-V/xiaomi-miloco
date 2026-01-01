@@ -59,7 +59,7 @@ RUN ./configure \
     --enable-gpl \
     --enable-version3 \
     --disable-nonfree \
-    --enable-libva \
+    --enable-vaapi \
     --enable-libdrm \
     --enable-hwaccel=h264_vaapi \
     --enable-hwaccel=hevc_vaapi \
