@@ -38,7 +38,6 @@ RUN apt-get update && apt-get install -y \
     nasm \
     libva-dev \
     libva-drm2 \
-    libva-intel-driver \
     intel-media-va-driver \
     && rm -rf /var/lib/apt/lists/*
 
