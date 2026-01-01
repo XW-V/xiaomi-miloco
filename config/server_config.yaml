@@ -57,6 +57,14 @@ trigger_rule_runner:
 # Camera configuration
 camera:
   frame_interval: 2000 # Unit: Millisecond (ms)
+  # Hardware acceleration configuration
+  # Enable hardware acceleration for video decoding (HEVC/H.265, H.264)
+  # Requires Intel/AMD GPU with VAAPI support and appropriate drivers
+  enable_hw_accel: true
+  # Hardware acceleration type (vaapi for Linux Intel/AMD GPUs)
+  hw_accel_type: "vaapi"
+  # Hardware device path (typically /dev/dri/renderD128 for Intel GPUs)
+  hw_device_path: "/dev/dri/renderD128"
   # Per-camera video quality configuration
   # Format: camera_did: quality_level
   # Quality levels: 1=LOW, 2=MEDIUM, 3=HIGH

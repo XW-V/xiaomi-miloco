@@ -7,9 +7,11 @@ MIoT Decoder.
 import asyncio
 from collections import deque
 import logging
+import os
 import subprocess
 import threading
 import time
+from pathlib import Path
 from typing import List, Callable, Coroutine, Optional
 from io import BytesIO
 from av.packet import Packet
@@ -25,6 +27,41 @@ from .types import MIoTCameraFrameType, MIoTCameraCodec, MIoTCameraFrameData
 from .error import MIoTMediaDecoderError
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _setup_library_paths():
+    """Setup library paths for third-party FFmpeg and VAAPI libraries."""
+    third_party_dir = Path(__file__).parent.parent.parent / "third_party"
+    
+    if not third_party_dir.exists():
+        _LOGGER.debug("Third party directory not found, using system libraries")
+        return
+    
+    # Setup FFmpeg library path
+    ffmpeg_lib = third_party_dir / "ffmpeg" / "linux" / "x86_64" / "lib"
+    if ffmpeg_lib.exists():
+        current_ld_path = os.environ.get('LD_LIBRARY_PATH', '')
+        if str(ffmpeg_lib) not in current_ld_path:
+            os.environ['LD_LIBRARY_PATH'] = f"{ffmpeg_lib}:{current_ld_path}"
+            _LOGGER.info(f"Added FFmpeg library path: {ffmpeg_lib}")
+    
+    # Setup VAAPI library path
+    vaapi_lib = third_party_dir / "vaapi" / "linux" / "x86_64" / "lib"
+    if vaapi_lib.exists():
+        current_ld_path = os.environ.get('LD_LIBRARY_PATH', '')
+        if str(vaapi_lib) not in current_ld_path:
+            os.environ['LD_LIBRARY_PATH'] = f"{vaapi_lib}:{current_ld_path}"
+            _LOGGER.info(f"Added VAAPI library path: {vaapi_lib}")
+        
+        # Set VAAPI driver path
+        driver_path = vaapi_lib / "dri"
+        if driver_path.exists():
+            os.environ['LIBVA_DRIVERS_PATH'] = str(driver_path)
+            _LOGGER.info(f"Set VAAPI driver path: {driver_path}")
+
+
+# Initialize library paths on module load
+_setup_library_paths()
 
 
 class MIoTMediaRingBuffer():
@@ -102,6 +139,8 @@ class MIoTMediaDecoder(threading.Thread):
     _frame_interval: int
     _enable_hw_accel: bool
     _enable_audio: bool
+    _hw_accel_available: bool
+    _hw_accel_type: Optional[str]
 
     # format: did, data, ts, channel
     _video_callback: Callable[[bytes, int, int], Coroutine]
@@ -146,6 +185,12 @@ class MIoTMediaDecoder(threading.Thread):
         self._resampler = None  # type: ignore
 
         self._last_jpeg_ts = 0
+        self._hw_accel_available = False
+        self._hw_accel_type = None
+        
+        # Detect hardware acceleration availability
+        if self._enable_hw_accel:
+            self._hw_accel_available = self._detect_hw_acceleration()
 
     def run(self) -> None:
         """Start the decoder."""
@@ -176,54 +221,105 @@ class MIoTMediaDecoder(threading.Thread):
     def push_audio_frame(self, frame_data: MIoTCameraFrameData) -> None:
         self._queue.put_audio(frame_data)
 
-    def detect_hwaccel(self):
+    def _detect_hw_acceleration(self) -> bool:
+        """Detect if hardware acceleration is available."""
         try:
-            result = subprocess.run(
-                ["ffmpeg", "-hwaccels"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=True
-            )
-            hw_list = result.stdout.strip().split("\n")[1:]
-            return hw_list
-        except FileNotFoundError:
-            return []
+            # Try to create a temporary decoder to check hardware devices
+            temp_decoder = VideoCodecContext.create("h264", "r")
+            hw_devices = temp_decoder.hw_devices
+            
+            if hw_devices:
+                for device in hw_devices:
+                    if device.type == 'vaapi':
+                        self._hw_accel_type = 'vaapi'
+                        _LOGGER.info("VAAPI hardware acceleration detected")
+                        return True
+            
+            _LOGGER.info("No VAAPI hardware acceleration available, will use software decoding")
+            return False
+            
+        except Exception as e:
+            _LOGGER.warning(f"Failed to detect hardware acceleration: {e}")
+            return False
 
-    def choose_hw_decoder(self, codec_name, hw_methods):
-        if codec_name in ("h264", "hevc"):
-            if f"{codec_name}_v4l2m2m" in hw_methods:
-                return f"{codec_name}_v4l2m2m"
-        return codec_name
+    def _init_hw_decoder(self, codec_name: str) -> VideoCodecContext:
+        """Initialize hardware decoder for HEVC/H.264 with VAAPI support."""
+        try:
+            decoder = VideoCodecContext.create(codec_name, "r")
+            
+            # Get available hardware devices
+            hw_devices = decoder.hw_devices
+            
+            if not hw_devices:
+                raise Exception("No hardware devices available")
+            
+            # Find VAAPI device
+            for hw_device in hw_devices:
+                if hw_device.type == 'vaapi':
+                    decoder.hw_device = hw_device
+                    _LOGGER.info(f"Using VAAPI hardware decoder for {codec_name}")
+                    return decoder
+            
+            raise Exception("VAAPI device not found")
+            
+        except Exception as e:
+            _LOGGER.warning(f"Failed to init HW decoder for {codec_name}: {e}, fallback to software")
+            return VideoCodecContext.create(codec_name, "r")
 
     def _on_video_callback(self, frame_data: MIoTCameraFrameData) -> None:
         if not self._video_decoder:
-            # Create video decoder
+            # Create video decoder with hardware acceleration support
             if frame_data.codec_id == MIoTCameraCodec.VIDEO_H264:
-                self._video_decoder = VideoCodecContext.create("h264", "r")
+                if self._enable_hw_accel and self._hw_accel_available:
+                    self._video_decoder = self._init_hw_decoder("h264")
+                else:
+                    self._video_decoder = VideoCodecContext.create("h264", "r")
+                    _LOGGER.info("Using software decoder for H.264")
             elif frame_data.codec_id == MIoTCameraCodec.VIDEO_H265:
-                self._video_decoder = VideoCodecContext.create("hevc", "r")
-            _LOGGER.info("video decoder created, %s", frame_data.codec_id)
+                if self._enable_hw_accel and self._hw_accel_available:
+                    self._video_decoder = self._init_hw_decoder("hevc")
+                else:
+                    self._video_decoder = VideoCodecContext.create("hevc", "r")
+                    _LOGGER.info("Using software decoder for HEVC")
+            
+            _LOGGER.info("Video decoder created, codec=%s, hw_accel=%s", 
+                        frame_data.codec_id, 
+                        self._video_decoder.hw_device is not None)
+        
         pkt = Packet(frame_data.data)
         frames: List[VideoFrame] = self._video_decoder.decode(pkt)  # type: ignore
+        
         now_ts = int(time.time()*1000)
         if now_ts - self._last_jpeg_ts >= self._frame_interval:
             if not frames:
                 _LOGGER.info("video frame is empty, %d, %d", frame_data.codec_id, frame_data.timestamp)
                 self._last_jpeg_ts = now_ts
                 return
+            
             frame = frames[0]
-            # _LOGGER.debug("video frame, %d, %d", frame.height, frame.width)
-            rgb_frame: VideoFrame = frame.to_rgb()
-            img: Image.Image = rgb_frame.to_image()
-            buf: BytesIO = BytesIO()
-            img.save(buf, format="JPEG", quality=90)
-            jpeg_data = buf.getvalue()
-            self._main_loop.call_soon_threadsafe(
-                self._main_loop.create_task,
-                self._video_callback(jpeg_data, frame_data.timestamp, frame_data.channel)
-            )
-            self._last_jpeg_ts = now_ts
+            
+            # Handle hardware frames - need to transfer to system memory
+            try:
+                if frame.format.name.startswith('vaapi'):
+                    # Hardware frame: convert to RGB in system memory
+                    rgb_frame: VideoFrame = frame.reformat(frame.width, frame.height, format='rgb24')
+                else:
+                    # Already in system memory format
+                    rgb_frame: VideoFrame = frame.to_rgb()
+                
+                img: Image.Image = rgb_frame.to_image()
+                buf: BytesIO = BytesIO()
+                img.save(buf, format="JPEG", quality=90)
+                jpeg_data = buf.getvalue()
+                
+                self._main_loop.call_soon_threadsafe(
+                    self._main_loop.create_task,
+                    self._video_callback(jpeg_data, frame_data.timestamp, frame_data.channel)
+                )
+                self._last_jpeg_ts = now_ts
+                
+            except Exception as e:
+                _LOGGER.error("Failed to process video frame: %s", e)
 
     def _on_audio_callback(self, frame_data: MIoTCameraFrameData) -> None:
         if not self._audio_decoder:

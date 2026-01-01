@@ -85,6 +85,8 @@ class MIoTCameraInstance:
     _did: str
     _frame_interval: int
     _enable_hw_accel: bool
+    _hw_accel_type: Optional[str]
+    _hw_device_path: Optional[str]
 
     _camera_info: MIoTCameraInfo
     _callback_refs: Dict[str, Callable]
@@ -117,6 +119,8 @@ class MIoTCameraInstance:
         self._did = camera_info.did
         self._frame_interval = frame_interval
         self._enable_hw_accel = enable_hw_accel
+        self._hw_accel_type = None
+        self._hw_device_path = None
         self._callback_refs = {}
 
         self._video_qualities = [MIoTCameraVideoQuality.MEDIUM]
@@ -168,6 +172,8 @@ class MIoTCameraInstance:
         enable_audio: bool = True,
         enable_reconnect: bool = False,
         enable_record: bool = False,
+        hw_accel_type: Optional[str] = None,
+        hw_device_path: Optional[str] = None,
     ) -> None:
         """Start camera."""
         channel_count: int = self._camera_info.channel_count or 1
@@ -186,6 +192,8 @@ class MIoTCameraInstance:
         self._enable_audio = enable_audio
         self._enable_reconnect = enable_reconnect
         self._enable_record = enable_record
+        self._hw_accel_type = hw_accel_type
+        self._hw_device_path = hw_device_path
 
         # Init decoders
         for _ in range(channel_count):
@@ -605,6 +613,8 @@ class MIoTCamera:
     _access_token: str
     _frame_interval: int
     _enable_hw_accel: bool
+    _hw_accel_type: Optional[str]
+    _hw_device_path: Optional[str]
     # key: did, value: MIoTCameraInstance
     _camera_map: Dict[str, MIoTCameraInstance]
     # logger handler
@@ -629,6 +639,8 @@ class MIoTCamera:
         self._access_token = access_token
         self._frame_interval = frame_interval
         self._enable_hw_accel = enable_hw_accel
+        self._hw_accel_type = None
+        self._hw_device_path = None
         self._camera_map = {}
 
         # lib init
@@ -656,10 +668,18 @@ class MIoTCamera:
         """Camera map."""
         return self._camera_map
 
-    async def init_async(self, frame_interval: int = 500, enable_hw_accel: bool = False) -> None:
+    async def init_async(
+        self,
+        frame_interval: int = 500,
+        enable_hw_accel: bool = False,
+        hw_accel_type: Optional[str] = None,
+        hw_device_path: Optional[str] = None
+    ) -> None:
         """Init."""
         self._frame_interval = frame_interval
         self._enable_hw_accel = enable_hw_accel
+        self._hw_accel_type = hw_accel_type
+        self._hw_device_path = hw_device_path
         _LOGGER.info("miot camera lib version: %s", await self.get_camera_version_async())
 
     async def deinit_async(self) -> None:
@@ -681,6 +701,7 @@ class MIoTCamera:
         frame_interval: Optional[int] = None,
         enable_hw_accel: Optional[bool] = None,
     ) -> MIoTCameraInstance:
+        """Create camera instance."""
         """Create camera."""
         camera: MIoTCameraInfo = (
             MIoTCameraInfo(**camera_info) if isinstance(camera_info, Dict) else camera_info.model_copy()
@@ -696,6 +717,11 @@ class MIoTCamera:
             camera_info=camera,
             main_loop=self._main_loop
         )
+        
+        # Store hw_accel config for later use
+        self._camera_map[did]._hw_accel_type = self._hw_accel_type
+        self._camera_map[did]._hw_device_path = self._hw_device_path
+        
         return self._camera_map[did]
 
     async def get_camera_instance_async(self, did: str) -> Optional[MIoTCameraInstance]:
@@ -720,6 +746,7 @@ class MIoTCamera:
         enable_reconnect: bool = False,
     ) -> None:
         """Start camera."""
+        """Start camera."""
         # Check.
         if did not in self._camera_map:
             _LOGGER.error("camera not found, %s", did)
@@ -731,7 +758,9 @@ class MIoTCamera:
             pin_code=pin_code,
             qualities=qualities,
             enable_audio=enable_audio,
-            enable_reconnect=enable_reconnect
+            enable_reconnect=enable_reconnect,
+            hw_accel_type=self._hw_accel_type,
+            hw_device_path=self._hw_device_path
         )
 
     async def stop_camera_async(self, did: str) -> None:
