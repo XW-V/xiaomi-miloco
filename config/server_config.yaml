@@ -57,6 +57,12 @@ trigger_rule_runner:
 # Camera configuration
 camera:
   frame_interval: 2000 # Unit: Millisecond (ms)
+  # Per-camera video quality configuration
+  # Format: camera_did: quality_level
+  # Quality levels: 1=LOW, 2=MEDIUM, 3=HIGH
+  # Example: "123456789": 3 would set camera with did "123456789" to HIGH quality
+  camera_qualities: {}  # Leave empty to use default quality for all cameras
+  default_quality: 2  # Default to MEDIUM (2) if not specified
 
 
 # MIoT configuration, default to 'cn', use your MiHome cloud server

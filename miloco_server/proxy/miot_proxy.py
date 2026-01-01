@@ -12,7 +12,14 @@ from typing import Callable, Coroutine, Optional
 
 from pydantic_core import to_jsonable_python
 from miot.client import MIoTClient
-from miot.types import MIoTOauthInfo, MIoTCameraInfo, MIoTDeviceInfo, MIoTManualSceneInfo, MIoTUserInfo
+from miot.types import (
+    MIoTOauthInfo,
+    MIoTCameraInfo,
+    MIoTDeviceInfo,
+    MIoTManualSceneInfo,
+    MIoTUserInfo,
+    MIoTCameraVideoQuality
+)
 from miot.camera import MIoTCameraInstance
 
 from miloco_server.config import MIOT_CACHE_DIR, CAMERA_CONFIG
@@ -172,10 +179,35 @@ class MiotProxy:
             raise
 
 
+    def _get_camera_quality(self, camera_did: str) -> MIoTCameraVideoQuality:
+        """Get the video quality for a specific camera."""
+        # Check if camera has specific quality configuration
+        camera_qualities = CAMERA_CONFIG.get("camera_qualities", {})
+        if camera_did in camera_qualities:
+            quality_value = camera_qualities[camera_did]
+            # Validate quality value
+            if quality_value in [1, 2, 3]:
+                quality = MIoTCameraVideoQuality(quality_value)
+                logger.info("Using configured quality %s for camera %s", quality.name, camera_did)
+                return quality
+            else:
+                logger.warning(
+                    "Invalid quality value %s for camera %s, using default",
+                    quality_value, camera_did
+                )
+        
+        # Use default quality
+        default_quality = CAMERA_CONFIG.get("default_quality", 2)
+        quality = MIoTCameraVideoQuality(default_quality)
+        logger.info("Using default quality %s for camera %s", quality.name, camera_did)
+        return quality
+
     async def _create_camera_img_manager(self, camera_info: MIoTCameraInfo) -> CameraVisionHandler | None:
         camera_instance = await self._get_camera_instance(camera_info)
         if camera_instance is not None:
-            await camera_instance.start_async(enable_reconnect=True)
+            # Get camera-specific video quality
+            video_quality = self._get_camera_quality(camera_info.did)
+            await camera_instance.start_async(qualities=video_quality, enable_reconnect=True)
             camera_img_manager = CameraVisionHandler(
                 camera_info, camera_instance, max_size=self._camera_img_cache_max_size, ttl=self._camera_img_cache_ttl
             )
