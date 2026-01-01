@@ -27,8 +27,7 @@ FROM ubuntu:22.04 AS ffmpeg-builder
 
 # Install build dependencies
 RUN apt-get update && \
-    add-apt-repository -y universe && \
-    add-apt-repository -y multiverse && \
+    sed -i 's/restricted/restricted universe multiverse/g' /etc/apt/sources.list.d/ubuntu.sources && \
     apt-get update && apt-get install -y \
     wget \
     tar \
@@ -87,8 +86,7 @@ RUN make -j$(nproc) \
 FROM ffmpeg-builder AS pyav-builder
 
 # Install Python 3.12 and build dependencies (matching backend-base)
-RUN apt-get update && apt-get install -y \
-    software-properties-common \
+RUN apt-get update \
     && add-apt-repository ppa:deadsnakes/ppa \
     && apt-get install -y \
     python3.12 \
@@ -127,8 +125,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Install runtime dependencies including VAAPI
 RUN apt-get update && \
-    add-apt-repository -y universe && \
-    add-apt-repository -y multiverse && \
+    sed -i 's/restricted/restricted universe multiverse/g' /etc/apt/sources.list.d/ubuntu.sources && \
     apt-get update && apt-get install -y \
     libva2 \
     libva-drm2 \
