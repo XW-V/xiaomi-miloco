@@ -12,10 +12,10 @@ on:
         description: 'Build backend image'
         type: boolean
         default: true
-      build-ai-engine:
-        description: 'Build AI engine image'
-        type: boolean
-        default: false
+      #build-ai-engine:
+      #  description: 'Build AI engine image'
+      #  type: boolean
+      #  default: false
 
 jobs:
   setup:
