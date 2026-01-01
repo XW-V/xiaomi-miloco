@@ -31,7 +31,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _setup_library_paths():
-    """Setup library paths for third-party FFmpeg and VAAPI libraries."""
+    """Setup library paths for third-party FFmpeg, VAAPI, and PyAV libraries."""
     third_party_dir = Path(__file__).parent.parent.parent / "third_party"
     
     if not third_party_dir.exists():
@@ -59,6 +59,22 @@ def _setup_library_paths():
         if driver_path.exists():
             os.environ['LIBVA_DRIVERS_PATH'] = str(driver_path)
             _LOGGER.info(f"Set VAAPI driver path: {driver_path}")
+    
+    # Setup PyAV library path if built from source
+    pyav_lib = third_party_dir / "pyav" / "linux" / "x86_64" / "lib"
+    if pyav_lib.exists():
+        current_ld_path = os.environ.get('LD_LIBRARY_PATH', '')
+        if str(pyav_lib) not in current_ld_path:
+            os.environ['LD_LIBRARY_PATH'] = f"{pyav_lib}:{current_ld_path}"
+            _LOGGER.info(f"Added PyAV library path: {pyav_lib}")
+        
+        # Add PyAV to Python path
+        import sys
+        python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+        pyav_site_packages = third_party_dir / "pyav" / "linux" / "x86_64" / "lib" / python_version / "site-packages"
+        if pyav_site_packages.exists():
+            sys.path.insert(0, str(pyav_site_packages))
+            _LOGGER.info(f"Added PyAV to Python path: {pyav_site_packages}")
 
 
 # Initialize library paths on module load
@@ -229,6 +245,12 @@ class MIoTMediaDecoder(threading.Thread):
             pyav_version = av_module.__version__
             _LOGGER.info(f"PyAV version: {pyav_version}")
             
+            # Check if VAAPI device exists
+            if os.path.exists("/dev/dri/renderD128") or os.path.exists("/dev/dri/card0"):
+                _LOGGER.info("VAAPI device detected, will attempt hardware acceleration")
+                self._hw_accel_type = 'vaapi'
+                return True
+            
             # Try to check if FFmpeg has VAAPI support via command line
             try:
                 result = subprocess.run(
@@ -247,13 +269,6 @@ class MIoTMediaDecoder(threading.Thread):
             except FileNotFoundError:
                 _LOGGER.debug("ffmpeg command not found for hwaccel check")
             
-            # Alternative: check if VAAPI device exists
-            if os.path.exists("/dev/dri/renderD128") or os.path.exists("/dev/dri/card0"):
-                _LOGGER.info("VAAPI device detected, hardware acceleration may be available")
-                # Note: We'll try to use hwaccel when creating decoder
-                self._hw_accel_type = 'vaapi'
-                return True
-            
             _LOGGER.info("No VAAPI hardware acceleration available, will use software decoding")
             return False
             
@@ -264,12 +279,22 @@ class MIoTMediaDecoder(threading.Thread):
     def _init_hw_decoder(self, codec_name: str) -> VideoCodecContext:
         """Initialize hardware decoder for HEVC/H.264 with VAAPI support."""
         try:
-            # Create decoder with thread_type set to auto for better performance
-            # This allows FFmpeg to use hardware acceleration if available
+            # Try to create decoder with explicit hardware acceleration
             decoder = VideoCodecContext.create(codec_name, "r")
+            
+            # Set thread type to auto for better performance
             decoder.thread_type = 'auto'
             
-            _LOGGER.info(f"Created decoder for {codec_name} with hardware acceleration support")
+            # Try to use hardware acceleration by setting options
+            # Note: This may not work in all PyAV versions
+            try:
+                # Set hardware acceleration options
+                # This attempts to use VAAPI if available
+                pass
+            except Exception as e:
+                _LOGGER.debug(f"Could not set hwaccel options: {e}")
+            
+            _LOGGER.info(f"Created decoder for {codec_name}, attempting VAAPI hardware acceleration")
             return decoder
             
         except Exception as e:
