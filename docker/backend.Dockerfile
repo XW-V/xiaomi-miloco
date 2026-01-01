@@ -21,6 +21,98 @@ RUN npm run build
 
 
 ################################################
+# FFmpeg Builder with VAAPI
+################################################
+FROM ubuntu:22.04 AS ffmpeg-builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    tar \
+    git \
+    make \
+    gcc \
+    g++ \
+    yasm \
+    pkg-config \
+    nasm \
+    libva-dev \
+    libva-drm2 \
+    libva-intel-driver \
+    intel-media-va-driver-non-free \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set FFmpeg version
+ARG FFMPEG_VERSION=6.1.1
+
+# Download and build FFmpeg with VAAPI
+WORKDIR /build
+RUN wget "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz" \
+    && tar -xf "ffmpeg-${FFMPEG_VERSION}.tar.xz" \
+    && rm "ffmpeg-${FFMPEG_VERSION}.tar.xz"
+
+WORKDIR /build/ffmpeg-${FFMPEG_VERSION}
+
+RUN ./configure \
+    --prefix=/usr/local \
+    --enable-shared \
+    --disable-static \
+    --enable-gpl \
+    --enable-version3 \
+    --disable-nonfree \
+    --enable-libva \
+    --enable-libdrm \
+    --enable-hwaccel=h264_vaapi \
+    --enable-hwaccel=hevc_vaapi \
+    --enable-hwaccel=mjpeg_vaapi \
+    --enable-hwaccel=mpeg2_vaapi \
+    --enable-hwaccel=vp8_vaapi \
+    --enable-hwaccel=vp9_vaapi \
+    --enable-libx264 \
+    --enable-libx265 \
+    --disable-doc \
+    --disable-debug \
+    --enable-pic
+
+RUN make -j$(nproc) \
+    && make install \
+    && ldconfig
+
+
+################################################
+# PyAV Builder with VAAPI Support
+################################################
+FROM ffmpeg-builder AS pyav-builder
+
+# Install Python 3.12 and build dependencies (matching backend-base)
+RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y \
+    python3.12 \
+    python3.12-dev \
+    python3.12-venv \
+    python3-pip \
+    python3-dev \
+    python3-cython \
+    python3-numpy \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Use Python 3.12 as default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
+    && update-alternatives --install /usr/bin/python3-dev python3-dev /usr/bin/python3.12-dev 1
+
+# Clone and build PyAV from source
+WORKDIR /build
+RUN git clone https://github.com/PyAV-Org/PyAV.git
+
+WORKDIR /build/PyAV
+RUN python3 setup.py build_ext --no-config
+RUN python3 setup.py install
+
+
+################################################
 # Backend Base
 ################################################
 FROM python:3.12-slim AS backend-base
@@ -30,6 +122,22 @@ ARG PIP_INDEX_URL
 
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# Install runtime dependencies including VAAPI
+RUN apt-get update && apt-get install -y \
+    libva2 \
+    libva-drm2 \
+    libva-intel-driver \
+    intel-media-va-driver-non-free \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy FFmpeg and PyAV from builders
+COPY --from=ffmpeg-builder /usr/local /usr/local
+COPY --from=pyav-builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+
+# Update library paths
+ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+ENV PYTHONPATH=/usr/local/lib/python3.12/site-packages:$PYTHONPATH
 
 # Set working directory.
 WORKDIR /app
