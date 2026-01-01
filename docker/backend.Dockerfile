@@ -27,7 +27,7 @@ FROM ubuntu:22.04 AS ffmpeg-builder
 
 # Install build dependencies
 RUN apt-get update && \
-    sed -i 's/restricted/restricted universe multiverse/g' /etc/apt/sources.list.d/ubuntu.sources && \
+    sed -i 's/Components: main restricted/Components: main restricted universe multiverse/g' /etc/apt/sources.list.d/ubuntu.sources && \
     apt-get update && apt-get install -y \
     wget \
     tar \
@@ -125,7 +125,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Install runtime dependencies including VAAPI
 RUN apt-get update && \
-    sed -i 's/restricted/restricted universe multiverse/g' /etc/apt/sources.list.d/ubuntu.sources && \
+    sed -i 's/Components: main restricted/Components: main restricted universe multiverse/g' /etc/apt/sources.list.d/ubuntu.sources && \
     apt-get update && apt-get install -y \
     libva2 \
     libva-drm2 \
