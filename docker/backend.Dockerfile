@@ -111,7 +111,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Use Python 3.12 as default
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
 RUN ln -s /usr/bin/python3.12-config /usr/bin/python3-config
 
 # Clone and build PyAV from source
