@@ -92,6 +92,7 @@ FROM ffmpeg-builder AS pyav-builder
 # Install Python 3.12 and build dependencies (matching backend-base)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
+    gnupg \
     && add-apt-repository ppa:deadsnakes/ppa \
     && apt-get update \
     && apt-get install -y \
