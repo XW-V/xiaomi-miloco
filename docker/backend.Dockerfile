@@ -8,6 +8,8 @@
 #ARG PIP_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 ARG PIP_INDEX_URL=https://pypi.org/simple
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 ################################################
 # Frontend Builder
 ################################################
