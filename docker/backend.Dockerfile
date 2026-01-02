@@ -93,7 +93,7 @@ FROM ffmpeg-builder AS pyav-builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     gnupg \
-    && add-apt-repository ppa:deadsnakes/ppa \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update \
     && apt-get install -y \
     python3.12 \
@@ -101,7 +101,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12-venv \
     python3-pip \
     python3-dev \
-    python3-cython \
+    cython3 \
     python3-numpy \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
