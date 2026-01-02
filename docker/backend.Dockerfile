@@ -90,8 +90,10 @@ RUN make -j$(nproc) \
 FROM ffmpeg-builder AS pyav-builder
 
 # Install Python 3.12 and build dependencies (matching backend-base)
-RUN apt-get update \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
     && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update \
     && apt-get install -y \
     python3.12 \
     python3.12-dev \
