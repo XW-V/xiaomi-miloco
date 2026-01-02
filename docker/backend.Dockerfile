@@ -105,6 +105,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12-venv \
     python3-pip \
     python3-dev \
+    python3-setuptools \
     cython3 \
     python3-numpy \
     build-essential \
