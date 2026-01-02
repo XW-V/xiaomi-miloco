@@ -114,6 +114,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Use Python 3.12 as default
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
 
+
+# 1. 安装 deadsnakes 提供的 3.12 专用 distutils 补丁包（最推荐）
+RUN apt-get update && apt-get install -y python3.12-distutils
+
+# 2. 确保安装并更新 setuptools，它在 Python 3.12 中通过本地副本提供 distutils 兼容性
+RUN python3 -m pip install --upgrade setuptools
+
+
 # Clone and build PyAV from source
 WORKDIR /build
 RUN git clone https://github.com/PyAV-Org/PyAV.git
