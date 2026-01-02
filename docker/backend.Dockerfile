@@ -8,8 +8,6 @@
 #ARG PIP_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 ARG PIP_INDEX_URL=https://pypi.org/simple
 
-ENV DEBIAN_FRONTEND=noninteractive
-
 ################################################
 # Frontend Builder
 ################################################
@@ -26,6 +24,8 @@ RUN npm run build
 # FFmpeg Builder with VAAPI
 ################################################
 FROM --platform=linux/amd64 ubuntu:22.04 AS ffmpeg-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Install build dependencies
 RUN apt-get update && \
@@ -52,6 +52,7 @@ RUN apt-get update && \
 # Set FFmpeg version
 ARG FFMPEG_VERSION=6.1.1
 
+ENV DEBIAN_FRONTEND=noninteractive
 # Download and build FFmpeg with VAAPI
 WORKDIR /build
 RUN wget "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz" \
@@ -91,6 +92,7 @@ RUN make -j$(nproc) \
 ################################################
 FROM ffmpeg-builder AS pyav-builder
 
+ENV DEBIAN_FRONTEND=noninteractive
 # Install Python 3.12 and build dependencies (matching backend-base)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
@@ -130,6 +132,7 @@ FROM python:3.12-slim AS backend-base
 ARG PIP_INDEX_URL
 
 ENV TZ=Asia/Shanghai
+ENV DEBIAN_FRONTEND=noninteractive
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Install runtime dependencies including VAAPI
