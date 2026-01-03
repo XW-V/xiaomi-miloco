@@ -18,6 +18,7 @@ from av.packet import Packet
 from av.codec import CodecContext
 from av.video.codeccontext import VideoCodecContext
 from av.audio.codeccontext import AudioCodecContext
+from av.codec.hwaccel import HWAccel
 from av.audio.resampler import AudioResampler
 from av.video.frame import VideoFrame
 from av.audio.frame import AudioFrame
@@ -289,17 +290,16 @@ class MIoTMediaDecoder(threading.Thread):
                     raise Exception(f"VAAPI device not found: checked /dev/dri/renderD128 and /dev/dri/card0")
             
             _LOGGER.info(f"Using VAAPI device: {device_path}")
+
+
+            hwaccel = HWAccel(
+                device_type='vaapi', 
+                device=device_path)
+
+
+            decoder = VideoCodecContext.create(codec_name, "r", hwaccel=hwaccel)
             
-            # Create codec context with hardware acceleration options
-            decoder = VideoCodecContext.create(codec_name, "r")
-            
-            # Set hardware acceleration options directly
-            decoder.options = {
-                "hwaccel": "vaapi",
-                "hwaccel_device": device_path,
-            }
-            _LOGGER.info("VAAPI acceleration options set")
-            
+            _LOGGER.info("VAAPI acceleration options set")           
             # Set thread type to auto for better performance
             decoder.thread_type = 'auto'
             
