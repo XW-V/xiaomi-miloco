@@ -23,7 +23,6 @@ from av.video.frame import VideoFrame
 from av.audio.frame import AudioFrame
 from PIL import Image
 import av as av_module
-import av.hwdevice
 
 from .types import MIoTCameraFrameType, MIoTCameraCodec, MIoTCameraFrameData
 from .error import MIoTMediaDecoderError
@@ -169,7 +168,6 @@ class MIoTMediaDecoder(threading.Thread):
     _video_decoder: Optional[CodecContext]
     _audio_decoder: Optional[CodecContext]
     _resampler: AudioResampler
-    _hw_device_ctx: Optional[av.hwdevice.DeviceContext]
 
     _current_jpg_width: int
     _current_jpg_height: int
@@ -232,7 +230,6 @@ class MIoTMediaDecoder(threading.Thread):
         self._queue.stop()
         self._video_decoder = None
         self._audio_decoder = None
-        self._hw_device_ctx = None  # Clean up hardware device context
         self.join()
 
     def push_video_frame(self, frame_data: MIoTCameraFrameData) -> None:
@@ -293,39 +290,24 @@ class MIoTMediaDecoder(threading.Thread):
             
             _LOGGER.info(f"Using VAAPI device: {device_path}")
             
-            # Create a VAAPI hardware device context
-            hw_device = av.hwdevice.Device(
-                av.hwdevice.HWDeviceType.VAAPI,
-                device_path
-            )
-            _LOGGER.info("VAAPI hardware device context created successfully")
-            
-            # Create codec context
+            # Create codec context with hardware acceleration options
             decoder = VideoCodecContext.create(codec_name, "r")
             
-            # Attach hardware device context
-            decoder.hw_device_ctx = hw_device
-            _LOGGER.info(f"Hardware device context attached to {codec_name} decoder")
-            
-            # IMPORTANT: tell FFmpeg to output VAAPI frames
+            # Set hardware acceleration options directly
             decoder.options = {
                 "hwaccel": "vaapi",
-                "hwaccel_output_format": "vaapi",
+                "hwaccel_device": device_path,
             }
             _LOGGER.info("VAAPI acceleration options set")
             
             # Set thread type to auto for better performance
             decoder.thread_type = 'auto'
             
-            # Store device context for cleanup
-            self._hw_device_ctx = hw_device
-            
             _LOGGER.info(f"VAAPI hardware decoder for {codec_name} initialized successfully")
             return decoder
             
         except Exception as e:
             _LOGGER.warning(f"Failed to init VAAPI HW decoder for {codec_name}: {e}, fallback to software")
-            _LOGGER.warning("This is normal if PyAV doesn't support av.hwdevice API")
             # Fallback to software decoder
             return VideoCodecContext.create(codec_name, "r")
 
