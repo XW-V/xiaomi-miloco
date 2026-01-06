@@ -5,7 +5,7 @@
 # For China: 
 # - https://mirrors.aliyun.com/pypi/simple/
 # - https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
-# ARG PIP_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+ARG PIP_INDEX_URL=https://pypi.org/simple/
 
 
 ################################################
