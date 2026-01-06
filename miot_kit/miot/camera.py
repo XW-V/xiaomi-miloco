@@ -123,7 +123,7 @@ class MIoTCameraInstance:
         self._hw_device_path = None
         self._callback_refs = {}
 
-        self._video_qualities = [MIoTCameraVideoQuality.MEDIUM]
+        self._video_qualities = [MIoTCameraVideoQuality.LOW]
         self._pin_code = None
         self._enable_audio = True
         self._enable_reconnect = False
@@ -167,7 +167,7 @@ class MIoTCameraInstance:
 
     async def start_async(
         self,
-        qualities: MIoTCameraVideoQuality | List[MIoTCameraVideoQuality] = MIoTCameraVideoQuality.MEDIUM,
+        qualities: MIoTCameraVideoQuality | List[MIoTCameraVideoQuality] = MIoTCameraVideoQuality.LOW,
         pin_code: Optional[str] = None,
         enable_audio: bool = True,
         enable_reconnect: bool = False,
@@ -626,7 +626,7 @@ class MIoTCamera:
         return self._lib_miot_camera
 
     def __init__(
-            self, cloud_server: str, access_token: str, frame_interval: int = 2000, enable_hw_accel: bool = True,
+            self, cloud_server: str, access_token: str, frame_interval: int = 500, enable_hw_accel: bool = True,
             loop: Optional[asyncio.AbstractEventLoop] = None
     ) -> None:
         """Init."""
@@ -741,7 +741,7 @@ class MIoTCamera:
         self,
         did: str,
         pin_code: Optional[str] = None,
-        qualities: MIoTCameraVideoQuality | List[MIoTCameraVideoQuality] = MIoTCameraVideoQuality.MEDIUM,
+        qualities: MIoTCameraVideoQuality | List[MIoTCameraVideoQuality] = MIoTCameraVideoQuality.LOW,
         enable_audio: bool = True,
         enable_reconnect: bool = False,
     ) -> None:

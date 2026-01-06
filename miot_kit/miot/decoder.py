@@ -292,7 +292,7 @@ class MIoTMediaDecoder(threading.Thread):
             )
 
             decoder = VideoCodecContext.create(
-                "hevc",
+                codec_name,
                 "r",
                 hwaccel=hwaccel
             )
@@ -303,7 +303,7 @@ class MIoTMediaDecoder(threading.Thread):
                 "hwaccel_output_format": "vaapi",
             }
 
-            _LOGGER.info("VAAPI acceleration options set555")           
+            _LOGGER.info("VAAPI acceleration options set")           
             # Set thread type to auto for better performance
             decoder.thread_type = ThreadType.NONE
             
@@ -333,41 +333,29 @@ class MIoTMediaDecoder(threading.Thread):
             
             _LOGGER.info("Video decoder created, codec=%s", frame_data.codec_id)
         
-        # pkt = Packet(frame_data.data)
-        # frames: List[VideoFrame] = self._video_decoder.decode(pkt)  # type: ignore
-        
-        # now_ts = int(time.time()*1000)
-        # if now_ts - self._last_jpeg_ts >= self._frame_interval:
-        #     if not frames:
-        #         _LOGGER.info("video frame is empty, %d, %d", frame_data.codec_id, frame_data.timestamp)
-        #         self._last_jpeg_ts = now_ts
-        #         return
+        if self._frame_interval <= 0:
+            return
             
-        #     frame = frames[0]
-
-        #     _LOGGER.info(" format = %s", frame.format.name)
-            
-        #     # Process frame to RGB
-        #     try:
-        #         # Log frame format to verify hardware acceleration
-        #         _LOGGER.debug(f"Frame format: {frame.format.name}, width: {frame.width}, height: {frame.height}")
-                
-        #         # Convert to RGB format (works for both software and hardware frames)
-        #         rgb_frame: VideoFrame = frame.reformat(frame.width, frame.height, format='rgb24')
-                
-        #         img: Image.Image = rgb_frame.to_image()
-        #         buf: BytesIO = BytesIO()
-        #         img.save(buf, format="JPEG", quality=90)
-        #         jpeg_data = buf.getvalue()
-                
-        #         self._main_loop.call_soon_threadsafe(
-        #             self._main_loop.create_task,
-        #             self._video_callback(jpeg_data, frame_data.timestamp, frame_data.channel)
-        #         )
-        #         self._last_jpeg_ts = now_ts
-                
-        #     except Exception as e:
-        #         _LOGGER.error("Failed to process video frame: %s", e)
+        pkt = Packet(frame_data.data)
+        frames: List[VideoFrame] = self._video_decoder.decode(pkt)  # type: ignore
+        now_ts = int(time.time()*1000)
+        if now_ts - self._last_jpeg_ts >= self._frame_interval:
+            if not frames:
+                _LOGGER.info("video frame is empty, %d, %d", frame_data.codec_id, frame_data.timestamp)
+                self._last_jpeg_ts = now_ts
+                return
+            frame = frames[0]
+            # _LOGGER.debug("video frame, %d, %d", frame.height, frame.width)
+            rgb_frame: VideoFrame = frame.to_rgb()
+            img: Image.Image = rgb_frame.to_image()
+            buf: BytesIO = BytesIO()
+            img.save(buf, format="JPEG", quality=90)
+            jpeg_data = buf.getvalue()
+            self._main_loop.call_soon_threadsafe(
+                self._main_loop.create_task,
+                self._video_callback(jpeg_data, frame_data.timestamp, frame_data.channel)
+            )
+            self._last_jpeg_ts = now_ts
 
     def _on_audio_callback(self, frame_data: MIoTCameraFrameData) -> None:
         if not self._audio_decoder:

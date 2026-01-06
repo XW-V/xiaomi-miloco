@@ -12,14 +12,7 @@ from typing import Callable, Coroutine, Optional
 
 from pydantic_core import to_jsonable_python
 from miot.client import MIoTClient
-from miot.types import (
-    MIoTOauthInfo,
-    MIoTCameraInfo,
-    MIoTDeviceInfo,
-    MIoTManualSceneInfo,
-    MIoTUserInfo,
-    MIoTCameraVideoQuality
-)
+from miot.types import MIoTOauthInfo, MIoTCameraInfo, MIoTDeviceInfo, MIoTManualSceneInfo, MIoTUserInfo, MIoTCameraVideoQuality
 from miot.camera import MIoTCameraInstance
 
 from miloco_server.config import MIOT_CACHE_DIR, CAMERA_CONFIG

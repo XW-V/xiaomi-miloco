@@ -5,7 +5,8 @@
 # For China: 
 # - https://mirrors.aliyun.com/pypi/simple/
 # - https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
-ARG PIP_INDEX_URL=https://pypi.org/simple/
+#ARG PIP_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+ARG PIP_INDEX_URL=https://pypi.org/simple
 
 ################################################
 # Frontend Builder
@@ -112,8 +113,4 @@ COPY --from=frontend-builder /app/dist/ /app/miloco_server/static/
 
 EXPOSE 8000
 
-# Override by docker-compose, this is a default command.
-# HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD curl -f "https://127.0.0.1:8000" || exit 1
-
-# Start application
 CMD ["python3", "start_server.py"]
