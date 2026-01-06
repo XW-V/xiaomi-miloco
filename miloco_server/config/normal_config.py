@@ -105,7 +105,7 @@ CAMERA_CONFIG = {
         CHAT_CONFIG["vision_use_img_count"]
     ),
     "camera_qualities": _config["camera"].get("camera_qualities", {}),
-    "default_quality": _config["camera"].get("default_quality", 2),
+    "default_quality": _config["camera"].get("default_quality", 3),
 }
 
 # MIoT dynamic configuration

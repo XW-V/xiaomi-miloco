@@ -204,6 +204,8 @@ class MIoTMediaDecoder(threading.Thread):
             elif frame_data.codec_id == MIoTCameraCodec.VIDEO_H265:
                 self._video_decoder = VideoCodecContext.create("hevc", "r")
             _LOGGER.info("video decoder created, %s", frame_data.codec_id)
+        if self._frame_interval <=0:
+            return
         pkt = Packet(frame_data.data)
         frames: List[VideoFrame] = self._video_decoder.decode(pkt)  # type: ignore
         now_ts = int(time.time()*1000)
